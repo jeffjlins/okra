@@ -1,0 +1,16 @@
+# Example configuration file for Okra
+# Copy this to config.yaml and fill in your values
+
+server:
+  port: "8080"
+
+firestore:
+  project_id: "tablebotproject"
+  database_id: "dev-tablebot"
+  
+  # Optional: Path to service account JSON file
+  # If not provided, the app will use:
+  # 1. GOOGLE_APPLICATION_CREDENTIALS environment variable
+  # 2. Default credentials (gcloud auth application-default login)
+  credentials_file: "google-service-account.json"
+

@@ -10,15 +10,26 @@ import (
 	"time"
 
 	"github.com/jeffjlins/okra/internal/bootstrap"
+	"github.com/jeffjlins/okra/internal/config"
 )
 
 func main() {
-	server := bootstrap.NewHTTPServer()
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	// Initialize application
+	app, err := bootstrap.NewApp(cfg)
+	if err != nil {
+		log.Fatalf("failed to initialize app: %v", err)
+	}
 
 	// graceful shutdown
 	go func() {
-		log.Println("HTTP server listening on :8080")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("HTTP server listening on :%s", cfg.Server.Port)
+		if err := app.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()
@@ -31,7 +42,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := app.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
 }
