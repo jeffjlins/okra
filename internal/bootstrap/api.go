@@ -14,7 +14,6 @@ import (
 type App struct {
 	Server     *http.Server
 	Firestore  *firestore.Client
-	Repository *firestore.Repository
 }
 
 func NewApp(cfg *Config) (*App, error) {
@@ -33,14 +32,13 @@ func NewApp(cfg *Config) (*App, error) {
 	}
 
 	// Create repositories
-	repo := firestore.NewRepository(fsClient)
 	uomRepo := firestore.NewUomRepository(fsClient)
 
 	// Create use cases/services
 	uomService := usecase.NewUomService(uomRepo)
 
 	// Create router with repositories and services
-	mux := httpadapter.NewRouter(repo, uomService)
+	mux := httpadapter.NewRouter(uomService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Server.Port,
@@ -51,7 +49,6 @@ func NewApp(cfg *Config) (*App, error) {
 	return &App{
 		Server:     server,
 		Firestore:  fsClient,
-		Repository: repo,
 	}, nil
 }
 

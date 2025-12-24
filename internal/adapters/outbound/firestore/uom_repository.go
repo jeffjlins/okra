@@ -49,3 +49,29 @@ func (r *UomRepository) GetByID(ctx context.Context, id string) (*domain.Uom, er
 
 	return &uom, nil
 }
+
+func (r *UomRepository) GetAll(ctx context.Context) ([]*domain.Uom, error) {
+	docs, err := r.client.Collection(uomCollection).Documents(ctx).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all uoms: %w", err)
+	}
+
+	uoms := make([]*domain.Uom, 0, len(docs))
+	for _, doc := range docs {
+		var uom domain.Uom
+		if err := doc.DataTo(&uom); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal uom %s: %w", doc.Ref.ID, err)
+		}
+		uoms = append(uoms, &uom)
+	}
+
+	return uoms, nil
+}
+
+func (r *UomRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.client.Collection(uomCollection).Doc(id).Delete(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete uom %s: %w", id, err)
+	}
+	return nil
+}

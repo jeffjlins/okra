@@ -134,10 +134,12 @@ func NewUom(
 		MatchNamesRecipe:       []string{},
 		MatchNamesFoodLabel:    []string{},
 	}
+
 	// Apply optional configurations
 	for _, opt := range opts {
 		opt(uom)
 	}
+	
 	if err := uom.Validate(); err != nil {
 		return nil, err
 	}
