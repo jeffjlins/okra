@@ -1,4 +1,4 @@
-package config
+package bootstrap
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type FirestoreConfig struct {
 	CredentialsFile string // Optional: path to service account JSON file. If empty, uses GOOGLE_APPLICATION_CREDENTIALS env var or default credentials
 }
 
-func Load() (*Config, error) {
+func LoadConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -45,17 +45,15 @@ func Load() (*Config, error) {
 
 	// Read config file (optional - will use defaults if not found)
 	if err := viper.ReadInConfig(); err != nil {
+		// Only return error if it's not a "file not found" error
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// Only return error if it's not a "file not found" error
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
-		// Config file not found is OK - we'll use defaults and env vars
 	}
-
-	credentialsFile := viper.GetString("firestore.credentials_file")
 
 	// Resolve relative paths relative to the config file location (if config file was found)
 	// or relative to current working directory
+	credentialsFile := viper.GetString("firestore.credentials_file")
 	if credentialsFile != "" && !filepath.IsAbs(credentialsFile) {
 		if configFile := viper.ConfigFileUsed(); configFile != "" {
 			// Resolve relative to config file directory

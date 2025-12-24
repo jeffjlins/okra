@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/jeffjlins/okra/internal/bootstrap"
-	"github.com/jeffjlins/okra/internal/config"
 )
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load()
+	cfg, err := bootstrap.LoadConfig()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}

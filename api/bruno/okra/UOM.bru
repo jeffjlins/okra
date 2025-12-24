@@ -1,0 +1,44 @@
+meta {
+  name: UOM
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:8080/uom
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "label": "oz11",
+    
+    "enabled": true,
+    "measure_type": "weight",
+    "group": "main",
+    "group_min": 0.0,
+    "group_max": 100.0,
+    "snap_amount": [0.1, 0.25],
+    "snap_select": 0.2,
+    
+    "match_names_recipe": ["ohzee", "oz"],
+    "match_names_food_label": ["oz"],
+    
+    "default_name_type": "full",
+    "short_name_singular": "oz",
+    "short_name_plural": "oz",
+    "full_name_singular": "ounce",
+    "full_name_plural": "ounces",
+    
+    "info" : {
+      "name_group": "ounces",
+      "systems": ["metric", "gravel-based"]
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

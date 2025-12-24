@@ -8,7 +8,7 @@ import (
 
 	httpadapter "github.com/jeffjlins/okra/internal/adapters/inbound/http"
 	"github.com/jeffjlins/okra/internal/adapters/outbound/firestore"
-	"github.com/jeffjlins/okra/internal/config"
+	"github.com/jeffjlins/okra/internal/usecase"
 )
 
 type App struct {
@@ -17,7 +17,7 @@ type App struct {
 	Repository *firestore.Repository
 }
 
-func NewApp(cfg *config.Config) (*App, error) {
+func NewApp(cfg *Config) (*App, error) {
 	ctx := context.Background()
 
 	// Initialize Firestore client
@@ -32,11 +32,15 @@ func NewApp(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize firestore client: %w", err)
 	}
 
-	// Create repository
+	// Create repositories
 	repo := firestore.NewRepository(fsClient)
+	uomRepo := firestore.NewUomRepository(fsClient)
 
-	// Create router with repository
-	mux := httpadapter.NewRouter(repo)
+	// Create use cases/services
+	uomService := usecase.NewUomService(uomRepo)
+
+	// Create router with repositories and services
+	mux := httpadapter.NewRouter(repo, uomService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Server.Port,

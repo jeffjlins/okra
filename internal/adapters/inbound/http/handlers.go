@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
-	"github.com/jeffjlins/okra/internal/adapters/outbound/firestore"
+	"github.com/jeffjlins/okra/internal/domain"
+	"github.com/jeffjlins/okra/internal/usecase"
 )
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
@@ -14,23 +16,8 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-func helloHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	resp := map[string]string{
-		"message": "hello, world",
-	}
-
-	json.NewEncoder(w).Encode(resp)
-}
-
-// DemoRequest represents the JSON payload for the demo endpoint
-type DemoRequest struct {
-	Field1 string `json:"field1"`
-	Field2 string `json:"field2"`
-}
-
-func createDemoHandler(repo *firestore.Repository) http.HandlerFunc {
+// createUomHandler handles POST /uom requests to create a new Uom
+func createUomHandler(uomService *usecase.UomService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -39,36 +26,40 @@ func createDemoHandler(repo *firestore.Repository) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		// Decode JSON payload
-		var req DemoRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Decode JSON payload into domain.BaseUom
+		var base domain.BaseUom
+		if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
 			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		// Validate that both fields are provided
-		if req.Field1 == "" || req.Field2 == "" {
-			http.Error(w, "Both field1 and field2 are required", http.StatusBadRequest)
-			return
-		}
-
-		// Save to Firestore
+		// Create Uom using the service (which handles validation and persistence)
 		ctx := r.Context()
-		docID, err := repo.SaveWithAutoID(ctx, "demo", req)
+		uom, err := uomService.CreateUom(ctx, &base)
 		if err != nil {
-			log.Printf("Error saving to Firestore: %v", err)
-			http.Error(w, "Failed to save data", http.StatusInternalServerError)
+			log.Printf("Error creating Uom: %v", err)
+
+			// Return appropriate status code based on error type
+			statusCode := http.StatusInternalServerError
+			errorMsg := "Failed to create Uom"
+
+			// Check for validation or duplicate errors
+			errStr := err.Error()
+			if strings.Contains(errStr, "validation failed") {
+				statusCode = http.StatusBadRequest
+				errorMsg = errStr
+			} else if strings.Contains(errStr, "already exists") {
+				statusCode = http.StatusConflict
+				errorMsg = errStr
+			}
+
+			w.WriteHeader(statusCode)
+			json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
 			return
 		}
 
-		// Return success response with document ID
-		resp := map[string]interface{}{
-			"id":     docID,
-			"field1": req.Field1,
-			"field2": req.Field2,
-		}
-
+		// Return success response with the created Uom
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
+		json.NewEncoder(w).Encode(uom)
 	}
 }
