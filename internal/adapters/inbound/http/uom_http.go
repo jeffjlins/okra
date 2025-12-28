@@ -9,48 +9,40 @@ import (
 
 	"github.com/jeffjlins/okra/internal/domain"
 	"github.com/jeffjlins/okra/internal/usecase"
+	"github.com/jeffjlins/okra/internal/zerrors"
 )
 
-func createUomHandler(uomService *usecase.UomService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+type CustomHandler struct {
+	uomService *usecase.UomService
+}
 
-		w.Header().Set("Content-Type", "application/json")
-
-		var base domain.BaseUom
-		if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		ctx := r.Context()
-		uom, err := uomService.CreateUom(ctx, &base)
-		if err != nil {
-			log.Printf("Error creating Uom: %v", err)
-
-			statusCode := http.StatusInternalServerError
-			errorMsg := "Failed to create Uom"
-
-			errStr := err.Error()
-			if strings.Contains(errStr, "validation failed") {
-				statusCode = http.StatusBadRequest
-				errorMsg = errStr
-			} else if strings.Contains(errStr, "already exists") {
-				statusCode = http.StatusConflict
-				errorMsg = errStr
-			}
-
-			w.WriteHeader(statusCode)
-			json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(uom)
+func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request) error { // (uomService *usecase.UomService) http.HandlerFunc {
+	if r.Method != http.MethodPost {
+		//TODO: Provide default messages for status codes?
+		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var base domain.BaseUom
+	if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
+		//TODO: Add message "Invalid JSON" so it's clear what kind of bad request it is
+		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest)
+	}
+
+	ctx := r.Context()
+	uom, err := h.uomService.CreateUom(ctx, &base)
+	if err != nil {
+		he := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.Generalize(err), he)
+		return he
+		//TODO: Conflict - "User Id already exists" (shouldn't take id anyway so should be bad request), test this
+		//TODO: Bad Request - show all validation errors when that is happening
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(uom)
+	return nil
 }
 
 func getUomByIDHandler(uomService *usecase.UomService) http.HandlerFunc {
