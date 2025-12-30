@@ -23,8 +23,111 @@ func New[T ~string](code T) *Error[T] {
 		wrappedErr: nil,
 		data:       map[string]any{},
 		tags:       hashset.New[string](),
-		stack:      captureStack(1),
+		stack:      captureStack(2),
 	}
+}
+
+// TODO: see comm [Structured Errors in Go](https://news.ycombinator.com/item?id=44148734)
+func (e *Error[T]) With(k string, v any) *Error[T] {
+	e.data[k] = v
+	return e
+}
+
+// WithError wraps an existing error.
+func (e *Error[T]) WithError(err error) *Error[T] {
+	e.wrappedErr = err
+
+	// Propagate the tags
+	if err != nil {
+		if wrappedErr, ok := err.(interface{ GetTags() []string }); ok {
+			if tags := wrappedErr.GetTags(); len(tags) > 0 {
+				e.tags.Add(tags...)
+			}
+		}
+	}
+
+	return e
+}
+
+// Error implements the error interface.
+func (e *Error[T]) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.wrappedErr != nil {
+		return fmt.Sprintf("%s: %s", e.code, e.wrappedErr.Error())
+	}
+	return string(e.code)
+}
+
+// // Errorf formats and wraps an error message.
+// func (e *Error[T]) Errorf(format string, a ...any) *Error[T] {
+// 	e.wrappedErr = fmt.Errorf(format, a...)
+// 	return e
+// }
+
+// Unwrap implements error unwrapping.
+func (e *Error[T]) Unwrap() error {
+	return e.wrappedErr
+}
+
+func (e *Error[T]) Tags(tags ...string) *Error[T] {
+	e.tags.Add(tags...)
+	return e
+}
+
+func (e *Error[T]) HasTags(tags ...string) bool {
+	return e.tags.Contains(tags...)
+}
+
+func (e *Error[T]) GetTags() []string {
+	if e == nil {
+		return []string{}
+	}
+	if e.tags == nil {
+		return []string{}
+	}
+	return e.tags.Values()
+}
+
+func (e *Error[T]) Data() map[string]any {
+	if e == nil || e.data == nil {
+		return make(map[string]any)
+	}
+	result := make(map[string]any, len(e.data))
+	for k, v := range e.data {
+		result[k] = v
+	}
+	return result
+}
+
+func (e *Error[T]) Get(key string) (any, bool) {
+	val, ok := e.data[key]
+	return val, ok
+}
+
+func (e *Error[T]) StackTrace() string {
+	if e == nil || e.stack == nil {
+		return ""
+	}
+	return e.stack.String()
+}
+
+//nolint:ireturn // This is fine
+func (e *Error[T]) Code() T {
+	return e.code
+}
+
+func (e *Error[T]) CodeString() string {
+	return string(e.code)
+}
+
+func HasCode[T ~string](err error, code T) bool {
+	var e *Error[T]
+	if errors.As(err, &e) {
+		return e.Code() == code
+	}
+	return false
 }
 
 func (e *Error[T]) LogValue() slog.Value {
@@ -69,85 +172,6 @@ func (e *Error[T]) LogValue() slog.Value {
 	return slog.GroupValue(attrs...)
 }
 
-func (e *Error[T]) Tags(tags ...string) *Error[T] {
-	e.tags.Add(tags...)
-	return e
-}
-
-func (e *Error[T]) HasTags(tags ...string) bool {
-	return e.tags.Contains(tags...)
-}
-
-func (e *Error[T]) GetTags() []string {
-	if e == nil {
-		return []string{}
-	}
-	if e.tags == nil {
-		return []string{}
-	}
-	return e.tags.Values()
-}
-
-// TODO: see comm [Structured Errors in Go](https://news.ycombinator.com/item?id=44148734)
-func (e *Error[T]) With(k string, v any) *Error[T] {
-	e.data[k] = v
-	return e
-}
-
-func (e *Error[T]) Get(key string) (any, bool) {
-	val, ok := e.data[key]
-	return val, ok
-}
-
-// WithError wraps an existing error.
-func (e *Error[T]) WithError(err error) *Error[T] {
-	e.wrappedErr = err
-
-	// Propagate the tags
-	if err != nil {
-		if wrappedErr, ok := err.(interface{ GetTags() []string }); ok {
-			if tags := wrappedErr.GetTags(); len(tags) > 0 {
-				e.tags.Add(tags...)
-			}
-		}
-	}
-
-	return e
-}
-
-// Errorf formats and wraps an error message.
-func (e *Error[T]) Errorf(format string, a ...any) *Error[T] {
-	e.wrappedErr = fmt.Errorf(format, a...)
-	return e
-}
-
-// Code returns the error code.
-//
-//nolint:ireturn // This is fine
-func (e *Error[T]) Code() T {
-	return e.code
-}
-
-func (e *Error[T]) CodeString() string {
-	return string(e.code)
-}
-
-// Error implements the error interface.
-func (e *Error[T]) Error() string {
-	if e == nil {
-		return ""
-	}
-	if e.wrappedErr != nil {
-		return fmt.Sprintf("%s: %s", e.code, e.wrappedErr.Error())
-	}
-	return string(e.code)
-}
-
-// Unwrap implements error unwrapping.
-func (e *Error[T]) Unwrap() error {
-	return e.wrappedErr
-}
-
 // Is implements error comparison.
 func (e *Error[T]) Is(target error) bool {
 	t, ok := target.(*Error[T])
@@ -182,12 +206,4 @@ func As[T ~string, V any](err error, fn func(zerr *Error[T]) V) (*V, bool) {
 	}
 	var empty *V
 	return empty, false
-}
-
-func HasCode[T ~string](err error, code T) bool {
-	var e *Error[T]
-	if errors.As(err, &e) {
-		return e.Code() == code
-	}
-	return false
 }

@@ -16,7 +16,7 @@ type CustomHandler struct {
 	uomService *usecase.UomService
 }
 
-func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request) error { // (uomService *usecase.UomService) http.HandlerFunc {
+func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] { // (uomService *usecase.UomService) http.HandlerFunc {
 	if r.Method != http.MethodPost {
 		//TODO: Provide default messages for status codes?
 		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
@@ -27,7 +27,7 @@ func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request)
 	var base domain.BaseUom
 	if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
 		//TODO: Add message "Invalid JSON" so it's clear what kind of bad request it is
-		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest)
+		return zerrors.New(ErrHttp).WithError(err).With("status_code", http.StatusBadRequest)
 	}
 
 	ctx := r.Context()
