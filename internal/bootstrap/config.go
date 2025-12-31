@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Server    ServerConfig
 	Firestore FirestoreConfig
+	Logging   LoggingConfig
 }
 
 type ServerConfig struct {
@@ -20,6 +21,10 @@ type FirestoreConfig struct {
 	ProjectID       string
 	DatabaseID      string // Optional: defaults to "(default)" if not specified
 	CredentialsFile string // Optional: path to service account JSON file. If empty, uses GOOGLE_APPLICATION_CREDENTIALS env var or default credentials
+}
+
+type LoggingConfig struct {
+	Format string // "json" or "text", defaults to "text"
 }
 
 func LoadConfig() (*Config, error) {
@@ -34,6 +39,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("firestore.project_id", "")
 	viper.SetDefault("firestore.database_id", "(default)")
 	viper.SetDefault("firestore.credentials_file", "")
+	viper.SetDefault("logging.format", "text")
 
 	// Environment variables
 	viper.SetEnvPrefix("OKRA")
@@ -42,6 +48,7 @@ func LoadConfig() (*Config, error) {
 	viper.BindEnv("firestore.project_id", "OKRA_FIRESTORE_PROJECT_ID")
 	viper.BindEnv("firestore.database_id", "OKRA_FIRESTORE_DATABASE_ID")
 	viper.BindEnv("firestore.credentials_file", "OKRA_FIRESTORE_CREDENTIALS_FILE")
+	viper.BindEnv("logging.format", "OKRA_LOGGING_FORMAT")
 
 	// Read config file (optional - will use defaults if not found)
 	if err := viper.ReadInConfig(); err != nil {
@@ -74,6 +81,9 @@ func LoadConfig() (*Config, error) {
 			ProjectID:       viper.GetString("firestore.project_id"),
 			DatabaseID:      viper.GetString("firestore.database_id"),
 			CredentialsFile: credentialsFile,
+		},
+		Logging: LoggingConfig{
+			Format: viper.GetString("logging.format"),
 		},
 	}
 

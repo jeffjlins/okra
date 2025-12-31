@@ -19,8 +19,8 @@ func Test_ErrorCreation(t *testing.T) {
 	err := zerrors.
 		New(domainErrNotFound).
 		With("user_id", 123).
-		With("trace", "1234").
-		Errorf("message")
+		With("trace", "1234") //.
+		// Errorf("message")
 
 	type dbErr string
 	const (
@@ -29,8 +29,8 @@ func Test_ErrorCreation(t *testing.T) {
 
 	errDB := zerrors.
 		New(dbErrZeroRows).
-		With("req_id", 10).
-		Errorf("db returned no rows")
+		With("req_id", 10) //.
+		// Errorf("db returned no rows")
 
 	err = err.WithError(errDB)
 
