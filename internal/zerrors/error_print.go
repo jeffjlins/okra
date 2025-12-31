@@ -68,7 +68,7 @@ func (e *Error[T]) LogErrorText(w io.Writer) {
 	}
 }
 
-func (e *Error[T]) WriteErrorHttpJSON(w http.ResponseWriter) {
+func (e *Error[T]) WriteErrorHttpJSON(w http.ResponseWriter, includeStackTrace bool) {
 	var code int
 	if c, ok := e.Get("status_code"); ok {
 		code = c.(int)
@@ -93,7 +93,13 @@ func (e *Error[T]) WriteErrorHttpJSON(w http.ResponseWriter) {
 	}
 
 	if wrapped := e.Unwrap(); wrapped != nil {
-		response.Wrapped = buildWrappedErrors(wrapped)
+		werrs := buildWrappedErrors(wrapped)
+		if !includeStackTrace {
+			for i := range werrs {
+				werrs[i].StackTrace = ""
+			}
+		}
+		response.Wrapped = werrs
 	}
 
 	w.Header().Set("Content-Type", "application/json")

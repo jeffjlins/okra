@@ -11,10 +11,11 @@ import (
 type APIFunc func(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError]
 
 type Router struct {
-	logFormat string
+	logFormat         string
+	includeStackTrace bool
 }
 
-func make(router *Router, f APIFunc) http.HandlerFunc {
+func (router *Router) make(f APIFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := f(w, r); err != nil {
 			if router.logFormat == "json" {
@@ -22,23 +23,27 @@ func make(router *Router, f APIFunc) http.HandlerFunc {
 			} else {
 				err.LogErrorText(os.Stderr)
 			}
-			err.WriteErrorHttpJSON(w)
+			err.WriteErrorHttpJSON(w, router.includeStackTrace)
 			return
 		}
 	}
 }
 
-func NewRouter(uomService *usecase.UomService, logFormat string) *http.ServeMux {
-	router := &Router{logFormat: logFormat}
+func NewRouter(uomService *usecase.UomService, logFormat string, includeStackTrace bool) *http.ServeMux {
+	router := &Router{
+		logFormat:         logFormat,
+		includeStackTrace: includeStackTrace,
+	}
 	mux := http.NewServeMux()
 
-	var ch CustomHandler = CustomHandler{uomService}
-	mux.HandleFunc("GET /health", healthHandler)
-	mux.HandleFunc("POST /uom", make(router, ch.createUomHandler))
-	mux.HandleFunc("GET /uom/{id}", getUomByIDHandler(uomService))
-	mux.HandleFunc("GET /uom", getAllUomsHandler(uomService))
-	mux.HandleFunc("DELETE /uom/{id}", deleteUomHandler(uomService))
-	mux.HandleFunc("PUT /uom/{id}", updateUomHandler(uomService))
+	healthAdp := HealthAdapter{}
+	mux.HandleFunc("GET /health", router.make(healthAdp.health))
+	uomAdp := UomAdapter{uomService}
+	mux.HandleFunc("POST /uom", router.make(uomAdp.create))
+	mux.HandleFunc("GET /uom/{id}", router.make(uomAdp.getOneById))
+	mux.HandleFunc("GET /uom", router.make(uomAdp.getAll))
+	mux.HandleFunc("DELETE /uom/{id}", router.make(uomAdp.delete))
+	mux.HandleFunc("PUT /uom/{id}", router.make(uomAdp.update))
 
 	return mux
 }

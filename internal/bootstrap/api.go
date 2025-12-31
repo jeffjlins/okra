@@ -38,7 +38,7 @@ func NewApp(cfg *Config) (*App, error) {
 	uomService := usecase.NewUomService(uomRepo)
 
 	// Create router with repositories and services
-	mux := httpadapter.NewRouter(uomService, cfg.Logging.Format)
+	mux := httpadapter.NewRouter(uomService, cfg.Logging.Format, false)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Server.Port,

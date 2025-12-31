@@ -2,21 +2,18 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/jeffjlins/okra/internal/domain"
 	"github.com/jeffjlins/okra/internal/usecase"
 	"github.com/jeffjlins/okra/internal/zerrors"
 )
 
-type CustomHandler struct {
+type UomAdapter struct {
 	uomService *usecase.UomService
 }
 
-func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] { // (uomService *usecase.UomService) http.HandlerFunc {
+func (adp *UomAdapter) create(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] {
 	if r.Method != http.MethodPost {
 		//TODO: Provide default messages for status codes?
 		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
@@ -26,16 +23,15 @@ func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request)
 
 	var base domain.BaseUom
 	if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
-		//TODO: Add message "Invalid JSON" so it's clear what kind of bad request it is
-		return zerrors.New(ErrHttp).WithError(err).With("status_code", http.StatusBadRequest)
+		return zerrors.New(ErrHttp).WithError(err).With("status_code", http.StatusBadRequest).With("reason", "Invalid JSON")
 	}
 
 	ctx := r.Context()
-	uom, err := h.uomService.CreateUom(ctx, &base)
+	uom, err := adp.uomService.CreateUom(ctx, &base)
 	if err != nil {
-		he := zerrors.New(ErrHttp)
-		serviceToHttpError(usecase.Generalize(err), he)
-		return he
+		e := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.GeneralizeError(err), e)
+		return e
 		//TODO: Conflict - "User Id already exists" (shouldn't take id anyway so should be bad request), test this
 		//TODO: Bad Request - show all validation errors when that is happening
 	}
@@ -45,137 +41,98 @@ func (h *CustomHandler) createUomHandler(w http.ResponseWriter, r *http.Request)
 	return nil
 }
 
-func getUomByIDHandler(uomService *usecase.UomService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		id := r.PathValue("id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
-
-		ctx := r.Context()
-		uom, err := uomService.GetUomByID(ctx, id)
-		if err != nil {
-			log.Printf("Error getting Uom: %v", err)
-
-			statusCode := http.StatusInternalServerError
-			if strings.Contains(err.Error(), "not found") {
-				statusCode = http.StatusNotFound
-			}
-
-			w.WriteHeader(statusCode)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-			return
-		}
-
-		json.NewEncoder(w).Encode(uom)
+func (adp *UomAdapter) getOneById(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] {
+	if r.Method != http.MethodGet {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	id := r.PathValue("id")
+	if id == "" {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest).With("reason", "id is required")
+	}
+
+	ctx := r.Context()
+	uom, err := adp.uomService.GetUomByID(ctx, id)
+	if err != nil {
+		e := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.GeneralizeError(err), e)
+		return e
+	}
+
+	json.NewEncoder(w).Encode(uom)
+	return nil
 }
 
-func getAllUomsHandler(uomService *usecase.UomService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		ctx := r.Context()
-		uoms, err := uomService.GetAllUoms(ctx)
-		if err != nil {
-			log.Printf("Error getting all Uoms: %v", err)
-			http.Error(w, "Failed to get Uoms", http.StatusInternalServerError)
-			return
-		}
-
-		json.NewEncoder(w).Encode(uoms)
+func (adp *UomAdapter) getAll(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] {
+	if r.Method != http.MethodGet {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	ctx := r.Context()
+	uoms, err := adp.uomService.GetAllUoms(ctx)
+	if err != nil {
+		e := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.GeneralizeError(err), e)
+		return e
+	}
+
+	json.NewEncoder(w).Encode(uoms)
+	return nil
 }
 
-func deleteUomHandler(uomService *usecase.UomService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		id := r.PathValue("id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
-
-		ctx := r.Context()
-		if err := uomService.DeleteUom(ctx, id); err != nil {
-			log.Printf("Error deleting Uom: %v", err)
-
-			statusCode := http.StatusInternalServerError
-			if strings.Contains(err.Error(), "not found") {
-				statusCode = http.StatusNotFound
-			}
-
-			w.WriteHeader(statusCode)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
+func (adp *UomAdapter) delete(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] {
+	if r.Method != http.MethodDelete {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "id is required", http.StatusBadRequest)
+		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest).With("reason", "id is required")
+	}
+
+	ctx := r.Context()
+	if err := adp.uomService.DeleteUom(ctx, id); err != nil {
+		e := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.GeneralizeError(err), e)
+		return e
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
-func updateUomHandler(uomService *usecase.UomService) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		id := r.PathValue("id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
-
-		var base domain.BaseUom
-		if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		ctx := r.Context()
-		uom, err := uomService.UpdateUom(ctx, id, &base)
-		if err != nil {
-			log.Printf("Error updating Uom: %v", err)
-
-			statusCode := http.StatusInternalServerError
-			errorMsg := "Failed to update Uom"
-
-			errStr := err.Error()
-			if strings.Contains(errStr, "not found") {
-				statusCode = http.StatusNotFound
-				errorMsg = errStr
-			} else if strings.Contains(errStr, "validation failed") {
-				statusCode = http.StatusBadRequest
-				errorMsg = errStr
-			}
-
-			w.WriteHeader(statusCode)
-			json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
-			return
-		}
-
-		json.NewEncoder(w).Encode(uom)
+func (adp *UomAdapter) update(w http.ResponseWriter, r *http.Request) *zerrors.Error[HttpError] {
+	if r.Method != http.MethodPut {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusMethodNotAllowed)
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	id := r.PathValue("id")
+	if id == "" {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest).With("reason", "id is required")
+	}
+
+	var base domain.BaseUom
+	if err := json.NewDecoder(r.Body).Decode(&base); err != nil {
+		return zerrors.New(ErrHttp).With("status_code", http.StatusBadRequest).With("reason", "invalid json")
+	}
+
+	ctx := r.Context()
+	uom, err := adp.uomService.UpdateUom(ctx, id, &base)
+	if err != nil {
+		e := zerrors.New(ErrHttp)
+		serviceToHttpError(usecase.GeneralizeError(err), e)
+		return e
+	}
+
+	json.NewEncoder(w).Encode(uom)
+	return nil
 }

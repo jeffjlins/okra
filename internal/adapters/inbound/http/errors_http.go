@@ -9,7 +9,7 @@ import (
 
 type HttpError string
 
-const ErrHttp HttpError = "adp_http_error"
+const ErrHttp HttpError = "adapter_http.error"
 
 func serviceToHttpError(se *zerrors.Error[usecase.ServiceError], he *zerrors.Error[HttpError]) {
 	switch se.Code() {

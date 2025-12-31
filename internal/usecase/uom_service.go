@@ -20,17 +20,17 @@ func NewUomService(repo domain.UomRepository) *UomService {
 type UomServiceError string
 
 const (
-	ErrUomValidation       UomServiceError = "serv_uom_validation_failure"
-	ErrUomDbCreate         UomServiceError = "serv_uom_db_create_failure"
-	ErrUomDbRead           UomServiceError = "serv_uom_db_read_failure"
-	ErrUomDbWrite          UomServiceError = "serv_uom_db_write_failure"
-	ErrUomDbDelete         UomServiceError = "serv_uom_db_delete_failure"
-	ErrUomDbExistenceCheck UomServiceError = "serv_uom_db_existence_check_failure"
-	ErrUomIdOverwrite      UomServiceError = "serv_uom_id_overwrite_not_allowed"
-	ErrUomNotFound         UomServiceError = "serv_uom_not_found"
+	ErrUomValidation       UomServiceError = "service_uom.validation_failure"
+	ErrUomDbCreate         UomServiceError = "service_uom.db_create_failure"
+	ErrUomDbRead           UomServiceError = "service_uom.db_read_failure"
+	ErrUomDbWrite          UomServiceError = "service_uom.db_write_failure"
+	ErrUomDbDelete         UomServiceError = "service_uom.db_delete_failure"
+	ErrUomDbExistenceCheck UomServiceError = "service_uom.db_existence_check_failure"
+	ErrUomIdOverwrite      UomServiceError = "service_uom.id_overwrite_not_allowed"
+	ErrUomNotFound         UomServiceError = "service_uom.not_found"
 )
 
-func generalizeUom(err *zerrors.Error[UomServiceError]) *zerrors.Error[ServiceError] {
+func generalizeErrorUom(err *zerrors.Error[UomServiceError]) *zerrors.Error[ServiceError] {
 	switch err.Code() {
 	case ErrUomDbCreate, ErrUomDbRead, ErrUomDbWrite, ErrUomDbDelete, ErrUomDbExistenceCheck:
 		return zerrors.New(ErrSrvSystem).WithError(err)
